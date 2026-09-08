@@ -121,7 +121,7 @@ Print a short summary in this exact format:
 ```
 Branch:    <branch_name>
 Spec file: .claude/specs/<step_number>-<feature_slug>.md
-Title:     <feature_title>
+Title:     <feature_title>  
 ```
 
 Then tell the user:

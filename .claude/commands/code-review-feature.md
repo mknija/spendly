@@ -12,7 +12,7 @@ If no argument is provided, stop immediately and say:
 "Please provide a spec name. Usage: /code-review-feature 
 <spec-name> e.g. /code-review-feature 03-login"
 
-## Pre-flight Check
+## Pre-flight Check    
 
 Before invoking any subagents, collect the diff:
 - Run `git diff` for unstaged changes

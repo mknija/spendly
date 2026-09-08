@@ -1,6 +1,6 @@
 ---
 description: Writes and runs tests for a specific Spendly feature. Pass the spec name as argument e.g. /test-feature 05-backend-connection
-allowed-tools: Bash(python -m pytest)
+allowed-tools: Bash(python -m pytest)   
 ---
 
 Run the full testing pipeline for the feature specified 
