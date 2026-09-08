@@ -1,4 +1,5 @@
 import os
+from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
@@ -120,21 +121,46 @@ def profile():
         initials = user_data["name"][:2].upper()
     user = {**user_data, "initials": initials}
 
+    def _valid_date(s):
+        try:
+            datetime.strptime(s, "%Y-%m-%d")
+            return True
+        except (ValueError, TypeError):
+            return False
+
+    start_raw = request.args.get("start_date", "")
+    end_raw = request.args.get("end_date", "")
+
+    start_date = start_raw if _valid_date(start_raw) else None
+    end_date = end_raw if _valid_date(end_raw) else None
+
+    filter_error = None
+    if start_date and end_date and start_date > end_date:
+        filter_error = "Start date is after end date — showing all-time data instead."
+        start_date, end_date = None, None
+
     # --- SUBAGENT 1: TRANSACTION HISTORY --------------------------------
-    transactions = get_recent_transactions(user_id)
+    transactions = get_recent_transactions(user_id, start_date=start_date, end_date=end_date)
     # ----------------------------------------------------------------------
 
     # --- SUBAGENT 2: SUMMARY STATS ----------------------------------------
-    stats = get_summary_stats(user_id)
+    stats = get_summary_stats(user_id, start_date=start_date, end_date=end_date)
     # ----------------------------------------------------------------------
 
     # --- SUBAGENT 3: CATEGORY BREAKDOWN ------------------------------------
-    raw_breakdown = get_category_breakdown(user_id)
+    raw_breakdown = get_category_breakdown(user_id, start_date=start_date, end_date=end_date)
     breakdown = [{"category": item["name"], "amount": item["amount"], "percent": item["pct"]} for item in raw_breakdown]
     # ------------------------------------------------------------------------
 
     return render_template(
-        "profile.html", user=user, stats=stats, transactions=transactions, breakdown=breakdown
+        "profile.html",
+        user=user,
+        stats=stats,
+        transactions=transactions,
+        breakdown=breakdown,
+        filter_error=filter_error,
+        start_raw=start_raw,
+        end_raw=end_raw,
     )
 
 
