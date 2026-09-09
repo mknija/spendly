@@ -1,11 +1,18 @@
+import math
 import os
 from datetime import datetime
 
 from flask import Flask, render_template, request, redirect, url_for, session
 from werkzeug.security import generate_password_hash, check_password_hash
 
-from database.db import get_db, init_db, seed_db
-from database.queries import get_user_by_id, get_recent_transactions, get_summary_stats, get_category_breakdown
+from database.db import get_db, init_db, seed_db, CATEGORIES
+from database.queries import (
+    get_user_by_id,
+    get_recent_transactions,
+    get_summary_stats,
+    get_category_breakdown,
+    insert_expense,
+)
 
 app = Flask(__name__)
 app.secret_key = os.environ.get("SECRET_KEY") or os.urandom(24)
@@ -18,6 +25,14 @@ with app.app_context():
 # ------------------------------------------------------------------ #
 # Routes                                                              #
 # ------------------------------------------------------------------ #
+
+def _valid_date(s):
+    try:
+        datetime.strptime(s, "%Y-%m-%d")
+        return True
+    except (ValueError, TypeError):
+        return False
+
 
 @app.route("/")
 def landing():
@@ -121,13 +136,6 @@ def profile():
         initials = user_data["name"][:2].upper()
     user = {**user_data, "initials": initials}
 
-    def _valid_date(s):
-        try:
-            datetime.strptime(s, "%Y-%m-%d")
-            return True
-        except (ValueError, TypeError):
-            return False
-
     start_raw = request.args.get("start_date", "")
     end_raw = request.args.get("end_date", "")
 
@@ -164,9 +172,52 @@ def profile():
     )
 
 
-@app.route("/expenses/add")
+@app.route("/expenses/add", methods=["GET", "POST"])
 def add_expense():
-    return "Add expense — coming in Step 7"
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+
+    if request.method == "POST":
+        amount_raw = request.form.get("amount", "")
+        category = request.form.get("category", "")
+        date_raw = request.form.get("date", "")
+        description_raw = request.form.get("description", "").strip()
+
+        def _rerender(error):
+            return render_template(
+                "add_expense.html",
+                error=error,
+                categories=CATEGORIES,
+                amount=amount_raw,
+                category=category,
+                date=date_raw,
+                description=description_raw,
+            )
+
+        try:
+            amount = float(amount_raw)
+            valid_amount = math.isfinite(amount) and amount > 0
+        except (ValueError, TypeError):
+            valid_amount = False
+
+        if not valid_amount:
+            return _rerender("Amount must be a number greater than 0.")
+
+        if category not in CATEGORIES:
+            return _rerender("Please select a valid category.")
+
+        if not _valid_date(date_raw):
+            return _rerender("Please enter a valid date.")
+
+        description = description_raw if description_raw else None
+
+        insert_expense(user_id, amount, category, date_raw, description)
+        return redirect(url_for("profile"))
+
+    today_str = datetime.today().strftime("%Y-%m-%d")
+    return render_template("add_expense.html", categories=CATEGORIES, date=today_str)
 
 
 @app.route("/expenses/<int:id>/edit")
