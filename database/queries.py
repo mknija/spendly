@@ -154,3 +154,15 @@ def update_expense(user_id, expense_id, amount, category, date, description):
     )
     db.commit()
     db.close()
+
+
+def delete_expense_by_id(user_id, expense_id):
+    """Delete an existing expense row owned by user_id. No-op if the row
+    doesn't exist or isn't owned by user_id."""
+    db = get_db()
+    db.execute(
+        "DELETE FROM expenses WHERE id = ? AND user_id = ?",
+        (expense_id, user_id),
+    )
+    db.commit()
+    db.close()
