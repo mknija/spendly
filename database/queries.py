@@ -60,14 +60,14 @@ def get_summary_stats(user_id, start_date=None, end_date=None):
 
 # --- SUBAGENT 1: TRANSACTION HISTORY -------------------------------------
 def get_recent_transactions(user_id, limit=10, start_date=None, end_date=None):
-    """Return list of dicts {date, description, category, amount}, newest
+    """Return list of dicts {id, date, description, category, amount}, newest
     first, date formatted "%b %d, %Y", description "—" if NULL.
     Empty list if no expenses.
     """
     db = get_db()
     clause, extra_params = _date_clause(start_date, end_date)
     rows = db.execute(
-        "SELECT date, description, category, amount FROM expenses "
+        "SELECT id, date, description, category, amount FROM expenses "
         f"WHERE user_id = ?{clause} ORDER BY date DESC, created_at DESC LIMIT ?",
         [user_id] + extra_params + [limit],
     ).fetchall()
@@ -78,6 +78,7 @@ def get_recent_transactions(user_id, limit=10, start_date=None, end_date=None):
         display_date = datetime.strptime(row["date"], "%Y-%m-%d").strftime("%b %d, %Y")
         transactions.append(
             {
+                "id": row["id"],
                 "date": display_date,
                 "description": row["description"] or "—",
                 "category": row["category"],
@@ -125,6 +126,31 @@ def insert_expense(user_id, amount, category, expense_date, description):
         "INSERT INTO expenses (user_id, amount, category, date, description) "
         "VALUES (?, ?, ?, ?, ?)",
         (user_id, amount, category, expense_date, description),
+    )
+    db.commit()
+    db.close()
+
+
+def get_expense_by_id(user_id, expense_id):
+    """Return the expense row (id, amount, category, date, description) for
+    user_id, or None if it doesn't exist / isn't owned by user_id."""
+    db = get_db()
+    row = db.execute(
+        "SELECT id, amount, category, date, description FROM expenses "
+        "WHERE id = ? AND user_id = ?",
+        (expense_id, user_id),
+    ).fetchone()
+    db.close()
+    return row
+
+
+def update_expense(user_id, expense_id, amount, category, date, description):
+    """Update an existing expense row owned by user_id. description may be None."""
+    db = get_db()
+    db.execute(
+        "UPDATE expenses SET amount = ?, category = ?, date = ?, description = ? "
+        "WHERE id = ? AND user_id = ?",
+        (amount, category, date, description, expense_id, user_id),
     )
     db.commit()
     db.close()

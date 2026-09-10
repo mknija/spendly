@@ -12,6 +12,8 @@ from database.queries import (
     get_summary_stats,
     get_category_breakdown,
     insert_expense,
+    get_expense_by_id,
+    update_expense,
 )
 
 app = Flask(__name__)
@@ -220,9 +222,63 @@ def add_expense():
     return render_template("add_expense.html", categories=CATEGORIES, date=today_str)
 
 
-@app.route("/expenses/<int:id>/edit")
+@app.route("/expenses/<int:id>/edit", methods=["GET", "POST"])
 def edit_expense(id):
-    return "Edit expense — coming in Step 8"
+    if not session.get("user_id"):
+        return redirect(url_for("login"))
+
+    user_id = session["user_id"]
+    expense = get_expense_by_id(user_id, id)
+    if expense is None:
+        return redirect(url_for("profile"))
+
+    if request.method == "POST":
+        amount_raw = request.form.get("amount", "")
+        category = request.form.get("category", "")
+        date_raw = request.form.get("date", "")
+        description_raw = request.form.get("description", "").strip()
+
+        def _rerender(error):
+            return render_template(
+                "edit_expense.html",
+                error=error,
+                categories=CATEGORIES,
+                expense_id=id,
+                amount=amount_raw,
+                category=category,
+                date=date_raw,
+                description=description_raw,
+            )
+
+        try:
+            amount = float(amount_raw)
+            valid_amount = math.isfinite(amount) and amount > 0
+        except (ValueError, TypeError):
+            valid_amount = False
+
+        if not valid_amount:
+            return _rerender("Amount must be a number greater than 0.")
+
+        if category not in CATEGORIES:
+            return _rerender("Please select a valid category.")
+
+        if not _valid_date(date_raw):
+            return _rerender("Please enter a valid date.")
+
+        description = description_raw if description_raw else None
+
+        update_expense(user_id, id, amount, category, date_raw, description)
+        return redirect(url_for("profile"))
+
+    return render_template(
+        "edit_expense.html",
+        categories=CATEGORIES,
+        expense_id=id,
+        amount=expense["amount"],
+        category=expense["category"],
+        date=expense["date"],
+        description=expense["description"] or "",
+    )
 
 
 @app.route("/expenses/<int:id>/delete")
